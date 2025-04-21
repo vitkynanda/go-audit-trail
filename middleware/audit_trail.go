@@ -87,7 +87,7 @@ func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client)
 			RequestQuery:   requestQuery,
 			RequestHeaders: string(headerJSON),
 			RequestBody:    string(requestBody),
-			ResponseCode:   responseCode,
+			ResponseCode:   int32(responseCode),
 			ResponseStatus: responseStatus,
 			UserAgent:      userAgent,
 			ClientIP:       clientIP,

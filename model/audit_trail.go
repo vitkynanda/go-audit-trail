@@ -13,7 +13,7 @@ type AuditTrail struct {
 	RequestQuery   string    `gorm:"type:String;column:request_query" json:"request_query"`                   // Raw query string
 	RequestHeaders string    `gorm:"type:String;column:request_headers" json:"request_headers"`               // JSON string
 	RequestBody    string    `gorm:"type:String;column:request_body" json:"request_body"`                     // Raw request body
-	ResponseCode   int       `gorm:"type:Int64;column:response_code" json:"response_code"`                    // Use Int32 for better compatibility
+	ResponseCode   int32     `gorm:"type:Int32;column:response_code" json:"response_code"`                    // Use Int32 for better compatibility
 	ResponseStatus string    `gorm:"type:LowCardinality(String);column:response_status" json:"response_status"`
 	UserAgent      string    `gorm:"type:String;column:user_agent" json:"user_agent"`
 	ClientIP       string    `gorm:"type:String;column:client_ip" json:"client_ip"`

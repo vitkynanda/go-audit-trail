@@ -3,15 +3,15 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/sirupsen/logrus"
 	"github.com/vitkynanda/go-audit-trail/model"
 	"gorm.io/gorm"
 )
 
-func StartRedisToClickHouseWorker(ctx context.Context, redisClient *redis.Client, db *gorm.DB, logger *log.Logger) {
+func StartRedisToClickHouseWorker(ctx context.Context, redisClient *redis.Client, db *gorm.DB, logger *logrus.Logger) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -26,7 +26,7 @@ func StartRedisToClickHouseWorker(ctx context.Context, redisClient *redis.Client
 	}
 }
 
-func processAuditTrail(ctx context.Context, redisClient *redis.Client, db *gorm.DB, logger *log.Logger) {
+func processAuditTrail(ctx context.Context, redisClient *redis.Client, db *gorm.DB, logger *logrus.Logger) {
 	results, err := redisClient.LRange(ctx, "audit_logs", 0, 99).Result()
 	if err != nil {
 		logger.Printf("Failed to fetch logs from Redis: %v", err)
