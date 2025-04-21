@@ -27,6 +27,8 @@ var bufferPool = sync.Pool{
 // AuditTrail is a middleware that captures HTTP request/response details and stores them in Redis.
 func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		logger.Println("AuditTrail middleware started")
 		start := time.Now()
 
 		// Capture request details
