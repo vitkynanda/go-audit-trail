@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,12 +16,15 @@ import (
 	"gorm.io/gorm"
 )
 
+const maxRequestBodySize = 10 * 1024 // 10 KB
+
 var bufferPool = sync.Pool{
 	New: func() interface{} {
 		return new(bytes.Buffer)
 	},
 }
 
+// AuditTrail is a middleware that captures HTTP request/response details and stores them in Redis.
 func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -33,19 +37,25 @@ func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client)
 		clientIP := c.ClientIP()
 		userAgent := c.Request.UserAgent()
 
-		// Read and restore the request body
+		// Read and restore the request body with size validation
 		var requestBody []byte
 		if c.Request.Body != nil {
 			buf := bufferPool.Get().(*bytes.Buffer)
 			buf.Reset()
 			defer bufferPool.Put(buf)
 
-			_, err := buf.ReadFrom(c.Request.Body)
+			// Limit the size of the request body
+			bodyReader := io.LimitReader(c.Request.Body, maxRequestBodySize)
+			_, err := buf.ReadFrom(bodyReader)
 			if err == nil {
 				requestBody = buf.Bytes()
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 			} else {
-				logger.WithError(err).Warn("Failed to read request body")
+				logger.WithFields(logrus.Fields{
+					"request_url":    requestURL,
+					"request_method": requestMethod,
+					"client_ip":      clientIP,
+				}).WithError(err).Warn("Failed to read request body or request body exceeds maximum size")
 			}
 		}
 
@@ -95,26 +105,44 @@ func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client)
 		}
 
 		// Push log entry to Redis queue asynchronously with retry mechanism
-		go func() {
-			jsonLog, err := json.Marshal(logEntry)
-			if err != nil {
-				logger.WithError(err).Error("Failed to marshal log entry")
+		go func(ctx context.Context) {
+			select {
+			case <-ctx.Done():
+				logger.Warn("Context canceled, stopping Redis push")
 				return
-			}
-
-			retryCount := 3
-			for i := 0; i < retryCount; i++ {
-				err = redisClient.LPush(c, "audit_logs", jsonLog).Err()
-				if err == nil {
-					break
+			default:
+				jsonLog, err := json.Marshal(logEntry)
+				if err != nil {
+					logger.WithFields(logrus.Fields{
+						"request_url":    requestURL,
+						"request_method": requestMethod,
+						"client_ip":      clientIP,
+					}).WithError(err).Error("Failed to marshal log entry")
+					return
 				}
-				logger.WithError(err).Warnf("Retry %d/%d: Failed to push log entry to Redis", i+1, retryCount)
-				time.Sleep(100 * time.Millisecond)
-			}
 
-			if err != nil {
-				logger.WithError(err).Error("Failed to push log entry to Redis after retries")
+				retryCount := 3
+				for i := 0; i < retryCount; i++ {
+					err = redisClient.LPush(ctx, "audit_logs", jsonLog).Err()
+					if err == nil {
+						break
+					}
+					logger.WithFields(logrus.Fields{
+						"request_url":    requestURL,
+						"request_method": requestMethod,
+						"client_ip":      clientIP,
+					}).WithError(err).Warnf("Retry %d/%d: Failed to push log entry to Redis", i+1, retryCount)
+					time.Sleep(time.Duration(i+1) * 200 * time.Millisecond) // Exponential backoff
+				}
+
+				if err != nil {
+					logger.WithFields(logrus.Fields{
+						"request_url":    requestURL,
+						"request_method": requestMethod,
+						"client_ip":      clientIP,
+					}).WithError(err).Error("Failed to push log entry to Redis after retries")
+				}
 			}
-		}()
+		}(c.Request.Context())
 	}
 }
