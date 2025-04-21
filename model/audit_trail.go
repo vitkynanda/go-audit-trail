@@ -2,10 +2,12 @@ package model
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type AuditTrail struct {
-	ID             string    `gorm:"primaryKey;type:UUID;column:id;default:generateUUIDv4()" json:"id"` // Use generateUUIDv4() for UUID
+	ID             uuid.UUID `gorm:"primaryKey;type:UUID;column:id;default:generateUUIDv4()" json:"id"` // Use generateUUIDv4() for UUID
 	Timestamp      time.Time `gorm:"type:DateTime;column:timestamp;default:now()" json:"timestamp"`
 	RequestURL     string    `gorm:"type:String;column:request_url" json:"request_url"`
 	RequestMethod  string    `gorm:"type:LowCardinality(String);column:request_method" json:"request_method"` // Low cardinality for better compression
