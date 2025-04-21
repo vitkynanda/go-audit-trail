@@ -21,7 +21,7 @@ var bufferPool = sync.Pool{
 	},
 }
 
-func AuditLogs(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client) gin.HandlerFunc {
+func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
