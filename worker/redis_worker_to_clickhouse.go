@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/vitkynanda/go-audit-trail/model"
 	"gorm.io/gorm"
@@ -134,12 +135,19 @@ func processAuditTrail(ctx context.Context, redisClient *redis.Client, db *gorm.
 			continue
 		}
 
-		// Validate required fields
-		if logEntry.Timestamp.IsZero() {
-			logger.Error("Missing required fields in log entry", logEntry)
-			failedEntries = append(failedEntries, result)
-			continue
+		if logEntry.ID == uuid.Nil {
+			logEntry.ID = uuid.New()
 		}
+		if logEntry.UserID == "" {
+			logEntry.UserID = "anonymous" // Default value for UserID
+		}
+		if logEntry.CreatedAt.IsZero() {
+			logEntry.CreatedAt = time.Now()
+		}
+		if logEntry.Timestamp.IsZero() {
+			logEntry.Timestamp = time.Now()
+		}
+
 		logs = append(logs, logEntry)
 		processedCount++
 	}
