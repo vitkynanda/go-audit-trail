@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type AuditTrail struct {
@@ -22,4 +23,14 @@ type AuditTrail struct {
 	DurationMs     int64     `gorm:"type:Int64;column:duration_ms" json:"duration_ms"`
 	UserID         string    `gorm:"type:String;column:user_id" json:"user_id"` // Optional: if you have user authentication
 	CreatedAt      time.Time `gorm:"type:DateTime;column:created_at;default:now()" json:"created_at"`
+}
+
+func (a *AuditTrail) BeforeCreate(tx *gorm.DB) (err error) {
+	if a.ID == uuid.Nil {
+		a.ID = uuid.New()
+	}
+	if a.UserID == "" {
+		a.UserID = "anonymous" // Default value for UserID
+	}
+	return nil
 }

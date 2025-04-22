@@ -24,10 +24,22 @@ var bufferPool = sync.Pool{
 	},
 }
 
+// CustomResponseWriter wraps gin.ResponseWriter to capture response body
+type CustomResponseWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+// Write captures the response and writes it to the original writer
+func (w *CustomResponseWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
+
+// AuditTrail middleware captures request and response details for audit logging
 func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
-		logger.Println("AuditTrail middleware execution")
+		logger.Debug("Starting AuditTrail middleware execution")
 		start := time.Now()
 
 		// Capture request details
@@ -119,10 +131,17 @@ func AuditTrail(conn *gorm.DB, logger *logrus.Logger, redisClient *redis.Client)
 				return
 			}
 
+			logger.WithFields(logrus.Fields{
+				"request_url": requestURL,
+			}).Debug("Pushing audit log to Redis")
+
 			retryCount := 3
 			for i := 0; i < retryCount; i++ {
 				err = redisClient.LPush(ctx, "audit_logs", jsonLog).Err()
 				if err == nil {
+					logger.WithFields(logrus.Fields{
+						"request_url": requestURL,
+					}).Debug("Successfully pushed audit log to Redis")
 					break
 				}
 				logger.WithFields(logrus.Fields{
